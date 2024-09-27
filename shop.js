@@ -107,8 +107,10 @@
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
+                sendFinalNotification("错误", mallName + "上传失败", "错误详情: " + error);
             } else {
                 console.log("商品信息上传成功: " + data);
+                sendFinalNotification("成功", mallName + "上传成功", "响应数据: " + data);
             }
         });
     }

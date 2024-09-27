@@ -137,10 +137,10 @@
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
-                sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "上传商品信息失败: " + error);
+                sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "上传信息: " + error);
             } else {
                 console.log("商品信息上传成功: " + data);
-                sendNotification("成功", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "商品信息上传成功: " + data);
+                sendNotification("成功", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "上传信息: " + data);
             }
             $done({});
         });

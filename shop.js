@@ -7,7 +7,7 @@
 
     try {
         var responseBody = JSON.parse($response.body);
-        console.log("响应体: " + JSON.stringify(responseBody, null, 2));
+        //console.log("响应体: " + JSON.stringify(responseBody, null, 2));
         var mallName = responseBody?.mall_entrance?.mall_data?.mall_name;
 
         console.log("解析到的商店名称：" + mallName);
@@ -31,7 +31,6 @@
     function checkBlacklist(mallName, responseBody) {
         var storedMallName = $persistentStore.read("blackmailMallName");
         var mallBool = "白";
-
         if (!storedMallName) {
             console.log("黑名单数据为空，开始从服务器获取黑名单数据...");
             $httpClient.get("https://example.com/get_blackmail", function(error, response, data) {
@@ -42,7 +41,6 @@
                     $done({});
                     return;
                 }
-
                 $persistentStore.write(data, "blackmailMallName");
                 console.log("已从服务器获取新的黑名单数据。");
                 mallBool = data.includes(mallName) ? "黑" : "白";
@@ -55,7 +53,6 @@
             processResponseBody(responseBody, mallBool, mallName);
         }
     }
-
     function processResponseBody(responseBody, mallBool, mallName) {
         if (mallBool === "黑") {
             console.log("该商店在黑名单中，不处理数据。");
@@ -67,19 +64,16 @@
             analyzeProductData(responseBody, mallBool, mallName);
         }
     }
-
     function analyzeProductData(responseBody, mallBool, mallName) {
         const maxPrice = 0.81;
         var lowestPrice = Infinity;
         var lowestPriceSkuInfo;
         console.log("商品价格分析中...");
-
         var skuJson = responseBody?.sku;
         if (skuJson) {
             skuJson.forEach((sku) => {
                 var priceOriginal = parseFloat(sku.normal_price) / 100;
                 var selectedPrice = Math.min(priceOriginal, sku.group_price ? parseFloat(sku.group_price) / 100 : priceOriginal);
-
                 if (selectedPrice <= maxPrice) {
                     if (selectedPrice < lowestPrice) {
                         lowestPrice = selectedPrice;
@@ -90,7 +84,6 @@
                     }
                 }
             });
-
             if (lowestPrice !== Infinity) {
                 uploadProductInfo("product_info", responseBody.goods.goods_name, mallName, lowestPrice, lowestPriceSkuInfo.sku_id, responseBody.goods.group_id);
                 notifications.push("价格符合，数据已上传。");
@@ -107,12 +100,10 @@
         }
         $done({});
     }
-
     function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, group_id) {
         console.log("准备上传商品信息...");
-        var url = `http://example.com/upload?name=${encodeURIComponent(goods_name)}&mall=${encodeURIComponent(mallName)}&price=${price}&sku=${sku_id}&group=${group_id}`;
+        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${encodeURIComponent(mallBool)}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
         console.log("上传URL: " + url);
-
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
@@ -121,7 +112,6 @@
             }
         });
     }
-
     function sendFinalNotification(type, title, content) {
         console.log("发送最终通知：" + title);
         if ($notification) {

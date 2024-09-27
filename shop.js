@@ -7,7 +7,6 @@
 
     try {
         var responseBody = JSON.parse($response.body);
-        //console.log("响应体: " + JSON.stringify(responseBody, null, 2));
         var mallName = responseBody?.mall_entrance?.mall_data?.mall_name;
 
         console.log("解析到的商店名称：" + mallName);
@@ -18,7 +17,7 @@
         } else {
             console.log("未能找到 mall_name 字段。");
             notifications.push("未能找到 mall_name 字段。");
-            sendFinalNotification("错误", "白名单店铺", notifications.join("; "));
+            sendFinalNotification("错误", "正常店铺", notifications.join("; "));
             $done({});
         }
     } catch (error) {
@@ -30,31 +29,32 @@
 
     function checkBlacklist(mallName, responseBody) {
         var storedMallName = $persistentStore.read("blackmailMallName");
-        var mallBool = "白";
+        var mallBool = false;
         if (!storedMallName) {
             console.log("黑名单数据为空，开始从服务器获取黑名单数据...");
             $httpClient.get("https://example.com/get_blackmail", function(error, response, data) {
                 if (error) {
                     console.log("获取黑名单数据时出错: " + error);
                     notifications.push("获取黑名单数据失败: " + error);
-                    sendFinalNotification("错误", mallName + "白名单店铺", notifications.join("; "));
+                    sendFinalNotification("错误", mallName + "正常店铺", notifications.join("; "));
                     $done({});
                     return;
                 }
                 $persistentStore.write(data, "blackmailMallName");
                 console.log("已从服务器获取新的黑名单数据。");
-                mallBool = data.includes(mallName) ? "黑" : "白";
+                mallBool = data.includes(mallName);
                 processResponseBody(responseBody, mallBool, mallName);
             });
         } else {
             console.log("读取到的黑名单数据，正在进行校验...");
-            mallBool = storedMallName.includes(mallName) ? "黑" : "白";
-            notifications.push(mallBool === "黑" ? "黑名单店铺。" : "正常店铺。");
+            mallBool = storedMallName.includes(mallName);
+            notifications.push(mallBool ? "黑名单店铺。" : "正常店铺。");
             processResponseBody(responseBody, mallBool, mallName);
         }
     }
+
     function processResponseBody(responseBody, mallBool, mallName) {
-        if (mallBool === "黑") {
+        if (mallBool) {
             console.log("该商店在黑名单中，不处理数据。");
             notifications.push("该商店在黑名单中。");
             sendFinalNotification("通知", mallName + "黑名单店铺", notifications.join("; "));
@@ -64,6 +64,7 @@
             analyzeProductData(responseBody, mallBool, mallName);
         }
     }
+
     function analyzeProductData(responseBody, mallBool, mallName) {
         const maxPrice = 0.81;
         var lowestPrice = Infinity;
@@ -85,9 +86,9 @@
                 }
             });
             if (lowestPrice !== Infinity) {
-                uploadProductInfo("product_info", responseBody.goods.goods_name, mallName, lowestPrice, lowestPriceSkuInfo.sku_id, responseBody.goods.group_id);
+                uploadProductInfo("product_info", responseBody.goods.goods_name, mallName, lowestPrice, lowestPriceSkuInfo.sku_id, responseBody.goods.group_id, mallBool);
                 notifications.push("价格符合，数据已上传。");
-                sendFinalNotification("成功", mallName + "白名单店铺", notifications.join("; "));
+                sendFinalNotification("成功", mallName + "正常店铺", notifications.join("; "));
             } else {
                 console.log("未找到合适的商品价格。");
                 notifications.push("未找到合适的商品价格。");
@@ -100,9 +101,10 @@
         }
         $done({});
     }
-    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, group_id) {
+
+    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, group_id, mallBool) {
         console.log("准备上传商品信息...");
-        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${encodeURIComponent(mallBool)}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
+        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${mallBool}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
         console.log("上传URL: " + url);
         $httpClient.get(url, function(error, response, data) {
             if (error) {
@@ -114,6 +116,7 @@
             }
         });
     }
+
     function sendFinalNotification(type, title, content) {
         console.log("发送最终通知：" + title);
         if ($notification) {

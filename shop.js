@@ -123,7 +123,7 @@
     function uploadProductInfo(tableName, goods_name, mallName, price, goods_id, group_id, sku_id, detail_id, mall_id, pdd_route, activity_id, mallBool) {
         var shopBool = encodeURIComponent("真");
 
-        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${mallBool}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
+        var url = `https://shop.zeroapi.v6.army/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${mallBool}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
 
         console.log("构建的请求URL: " + url);
 

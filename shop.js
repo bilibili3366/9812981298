@@ -1,5 +1,4 @@
 (function() {
-    var notifications = [];
     console.log("脚本开始执行");
     console.log("请求 URL: " + $request.url);
     console.log("响应状态码: " + $response.status);
@@ -16,14 +15,12 @@
             checkBlacklist(mallName, responseBody);
         } else {
             console.log("未能找到 mall_name 字段。");
-            notifications.push("未能找到 mall_name 字段。");
-            sendFinalNotification("错误", "未知店铺", notifications.join("; "));
+            sendNotification("错误", "未知店铺", "未能找到 mall_name 字段。");
             $done({});
         }
     } catch (error) {
         console.log("解析响应体或脚本执行错误: " + error);
-        notifications.push("解析响应体或脚本执行错误: " + error);
-        sendFinalNotification("错误", "脚本执行错误", notifications.join("; "));
+        sendNotification("错误", "脚本执行错误", "解析响应体或脚本执行错误: " + error);
         $done({});
     }
 
@@ -35,8 +32,7 @@
             $httpClient.get("https://sql.zeroapi.dns.army/get_blackmail?auth=z777999", function(error, response, data) {
                 if (error) {
                     console.log("获取黑名单数据时出错: " + error);
-                    notifications.push("获取黑名单数据失败: " + error);
-                    sendFinalNotification("错误", mallName + "正常店铺", notifications.join("; "));
+                    sendNotification("错误", mallName + "：正常店铺", "获取黑名单数据失败: " + error);
                     $done({});
                     return;
                 }
@@ -48,7 +44,6 @@
         } else {
             console.log("读取到的黑名单数据，正在进行校验...");
             mallBool = storedMallName.includes(mallName);
-            notifications.push(mallBool ? "黑名单店铺。" : "正常店铺。");
             processResponseBody(responseBody, mallBool, mallName);
         }
     }
@@ -64,8 +59,7 @@
 
         try {
             if (responseBody.goods?.is_pre_sale) {
-                notifications.push("预售：已跳过");
-                sendFinalNotification("通知", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                sendNotification("通知", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "预售：已跳过");
                 $done({});
                 return;
             }
@@ -112,19 +106,16 @@
                         mallBool
                     );
                 } else {
-                    notifications.push("价格过高或无效, 未上传数据。");
-                    sendFinalNotification("通知", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                    sendNotification("通知", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "价格过高或无效, 未上传数据。");
                     $done({});
                 }
             } else {
-                notifications.push("SKU解析失败");
-                sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "SKU解析失败");
                 $done({});
             }
         } catch (error) {
             console.log("商品数据解析错误: " + error);
-            notifications.push("商品数据解析错误: " + error);
-            sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+            sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "商品数据解析错误: " + error);
             $done({});
         }
     }
@@ -138,8 +129,7 @@
 
         if (!url.startsWith("http")) {
             console.log("无效的URL: " + url);
-            notifications.push("无效的上传URL");
-            sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+            sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "无效的上传URL");
             $done({});
             return;
         }
@@ -147,19 +137,17 @@
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
-                notifications.push("上传商品信息失败: " + error);
-                sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                sendNotification("错误", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "上传商品信息失败: " + error);
             } else {
                 console.log("商品信息上传成功: " + data);
-                notifications.push("商品信息上传成功: " + data);
-                sendFinalNotification("成功", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                sendNotification("成功", mallName + (mallBool ? "：黑名单店铺" : "：正常店铺"), "商品信息上传成功: " + data);
             }
             $done({});
         });
     }
 
-    function sendFinalNotification(type, title, content) {
-        console.log("发送最终通知：" + title + " - " + content);
+    function sendNotification(type, title, content) {
+        console.log("发送通知：" + type + " - " + title + " - " + content);
         if ($notification) {
             $notification.post(type, title, content);
         } else if ($notify) {

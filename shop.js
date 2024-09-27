@@ -99,19 +99,18 @@
                     responseBody.pdd_route,
                     responseBody.activity_id
                 );
-                notifications.push("价格符合，数据已上传。");
-                sendFinalNotification("成功", mallName + "正常店铺", notifications.join("; "));
             } else {
                 console.log("未找到合适的商品价格。");
                 notifications.push("未找到合适的商品价格。");
                 sendFinalNotification("错误", "价格分析错误", notifications.join("; "));
+                $done({});
             }
         } else {
             console.log("商品数据未包含SKU信息。");
             notifications.push("商品数据未包含SKU信息。");
             sendFinalNotification("错误", "数据解析错误", notifications.join("; "));
+            $done({});
         }
-        $done({});
     }
 
     function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, goods_id, group_id, mall_id, mallBool, pdd_route, activity_id) {
@@ -121,18 +120,23 @@
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
-                sendFinalNotification("错误", mallName + "上传失败", "错误详情: " + error);
+                notifications.push("上传失败: " + error);
+                sendFinalNotification("错误", mallName + "上传失败", notifications.join("; "));
             } else {
                 console.log("商品信息上传成功: " + data);
-                sendFinalNotification("成功", mallName + "上传成功", "响应数据: " + data);
+                notifications.push("上传成功: " + data);
+                sendFinalNotification("成功", mallName + "上传成功", notifications.join("; "));
             }
+            $done({}); // 确保在 HTTP 请求完成后结束脚本
         });
     }
 
     function sendFinalNotification(type, title, content) {
-        console.log("发送最终通知：" + title);
+        console.log("发送最终通知：" + title + " - " + content);
         if ($notification) {
             $notification.post(type, title, content);
+        } else if ($notify) {
+            $notify(type, title, content);
         }
     }
 })();

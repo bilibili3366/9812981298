@@ -17,7 +17,7 @@
         } else {
             console.log("未能找到 mall_name 字段。");
             notifications.push("未能找到 mall_name 字段。");
-            sendFinalNotification("错误", "正常店铺", notifications.join("; "));
+            sendFinalNotification("错误", "未知店铺", notifications.join("; "));
             $done({});
         }
     } catch (error) {
@@ -32,7 +32,7 @@
         var mallBool = false;
         if (!storedMallName) {
             console.log("黑名单数据为空，开始从服务器获取黑名单数据...");
-            $httpClient.get("https://example.com/get_blackmail", function(error, response, data) {
+            $httpClient.get("https://sql.zeroapi.dns.army/get_blackmail?auth=z777999", function(error, response, data) {
                 if (error) {
                     console.log("获取黑名单数据时出错: " + error);
                     notifications.push("获取黑名单数据失败: " + error);
@@ -54,80 +54,107 @@
     }
 
     function processResponseBody(responseBody, mallBool, mallName) {
-        if (mallBool) {
-            console.log("该商店在黑名单中，不处理数据。");
-            notifications.push("该商店在黑名单中。");
-            sendFinalNotification("通知", mallName + "黑名单店铺", notifications.join("; "));
-            $done({});
-        } else {
-            console.log("该商店不在黑名单中，继续处理数据。");
-            analyzeProductData(responseBody, mallBool, mallName);
-        }
+        analyzeProductData(responseBody, mallBool, mallName);
     }
 
     function analyzeProductData(responseBody, mallBool, mallName) {
         const maxPrice = 0.81;
         var lowestPrice = Infinity;
         var lowestPriceSkuInfo;
-        console.log("商品价格分析中...");
-        var skuJson = responseBody?.sku;
-        if (skuJson) {
-            skuJson.forEach((sku) => {
-                var priceOriginal = parseFloat(sku.normal_price) / 100;
-                var selectedPrice = Math.min(priceOriginal, sku.group_price ? parseFloat(sku.group_price) / 100 : priceOriginal);
-                if (selectedPrice <= maxPrice) {
-                    if (selectedPrice < lowestPrice) {
-                        lowestPrice = selectedPrice;
-                        lowestPriceSkuInfo = {
-                            sku_id: sku.sku_id,
-                            goods_id: sku.goods_id               
-                        };
+
+        try {
+            if (responseBody.goods?.is_pre_sale) {
+                notifications.push("预售：已跳过");
+                sendFinalNotification("通知", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                $done({});
+                return;
+            }
+
+            var group_id = responseBody.goods?.group?.[0]?.group_id;
+            var detail_id = responseBody.activity_collection?.activity?.detail_id;
+            var mall_id = responseBody.goods?.mall_id;
+            var goods_name = responseBody.goods?.goods_name;
+            var pdd_route = responseBody.mall_entrance?.mall_data?.pdd_route;
+            var activity_id = responseBody.activity_collection?.activity?.activity_id;
+
+            var skuJson = responseBody.sku;
+            if (skuJson) {
+                skuJson.forEach((sku) => {
+                    var price_original = parseFloat(sku.normal_price) / 100;
+                    var group_price = parseFloat(sku.group_price) / 100;
+
+                    var selectedPrice = Math.min(price_original, group_price);
+
+                    if (selectedPrice > 0.05 && selectedPrice <= maxPrice) {
+                        if (selectedPrice < lowestPrice) {
+                            lowestPrice = selectedPrice;
+                            lowestPriceSkuInfo = {
+                                sku_id: sku.sku_id,
+                                goods_id: sku.goods_id               
+                            };
+                        }
                     }
+                });
+
+                if (lowestPriceSkuInfo) {
+                    uploadProductInfo(
+                        "product_info", 
+                        goods_name, 
+                        mallName, 
+                        lowestPrice, 
+                        lowestPriceSkuInfo.goods_id, 
+                        group_id, 
+                        lowestPriceSkuInfo.sku_id, 
+                        detail_id, 
+                        mall_id, 
+                        pdd_route, 
+                        activity_id, 
+                        mallBool
+                    );
+                } else {
+                    notifications.push("价格过高或无效, 未上传数据。");
+                    sendFinalNotification("通知", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+                    $done({});
                 }
-            });
-            if (lowestPrice !== Infinity) {
-                uploadProductInfo(
-                    "product_info",
-                    responseBody.goods.goods_name,
-                    mallName,
-                    lowestPrice,
-                    lowestPriceSkuInfo.sku_id,
-                    lowestPriceSkuInfo.goods_id,
-                    responseBody.goods.group_id,
-                    responseBody.mall_id,
-                    mallBool,
-                    responseBody.pdd_route,
-                    responseBody.activity_id
-                );
             } else {
-                console.log("未找到合适的商品价格。");
-                notifications.push("未找到合适的商品价格。");
-                sendFinalNotification("错误", "价格分析错误", notifications.join("; "));
+                notifications.push("SKU解析失败");
+                sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
                 $done({});
             }
-        } else {
-            console.log("商品数据未包含SKU信息。");
-            notifications.push("商品数据未包含SKU信息。");
-            sendFinalNotification("错误", "数据解析错误", notifications.join("; "));
+        } catch (error) {
+            console.log("商品数据解析错误: " + error);
+            notifications.push("商品数据解析错误: " + error);
+            sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
             $done({});
         }
     }
 
-    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, goods_id, group_id, mall_id, mallBool, pdd_route, activity_id) {
-        console.log("准备上传商品信息...");
-        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&mall_id=${mall_id}&mall_bool=${mallBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
-        console.log("上传URL: " + url);
+    function uploadProductInfo(tableName, goods_name, mallName, price, goods_id, group_id, sku_id, detail_id, mall_id, pdd_route, activity_id, mallBool) {
+        var shopBool = encodeURIComponent("真");
+
+        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${mallBool}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
+
+        console.log("构建的请求URL: " + url);
+
+        if (!url.startsWith("http")) {
+            console.log("无效的URL: " + url);
+            notifications.push("无效的上传URL");
+            sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
+            $done({});
+            return;
+        }
+
         $httpClient.get(url, function(error, response, data) {
             if (error) {
                 console.log("上传商品信息时出错: " + error);
-                notifications.push("上传失败: " + error);
-                sendFinalNotification("错误", mallName + "上传失败", notifications.join("; "));
+                notifications.push("上传商品信息失败: " + error);
+                sendFinalNotification("错误", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
             } else {
                 console.log("商品信息上传成功: " + data);
-                notifications.push("上传成功: " + data);
-                sendFinalNotification("成功", mallName + "上传成功", notifications.join("; "));
+                notifications.push("商品信息上传成功: " + data);
+                sendFinalNotification("成功", mallName + (mallBool ? "黑名单店铺" : "正常店铺"), notifications.join("; "));
             }
-            $done({}); // 确保在 HTTP 请求完成后结束脚本
+            $done({});
         });
     }
 

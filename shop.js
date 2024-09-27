@@ -7,6 +7,7 @@
 
     try {
         var responseBody = JSON.parse($response.body);
+        console.log("响应体: " + JSON.stringify(responseBody, null, 2));
         var mallName = responseBody?.mall_entrance?.mall_data?.mall_name;
 
         console.log("解析到的商店名称：" + mallName);
@@ -21,8 +22,8 @@
             $done({});
         }
     } catch (error) {
-        console.error("脚本执行错误: " + error);
-        notifications.push("脚本执行错误: " + error);
+        console.log("解析响应体或脚本执行错误: " + error);
+        notifications.push("解析响应体或脚本执行错误: " + error);
         sendFinalNotification("错误", "脚本执行错误", notifications.join("; "));
         $done({});
     }
@@ -33,17 +34,18 @@
 
         if (!storedMallName) {
             console.log("黑名单数据为空，开始从服务器获取黑名单数据...");
-            $httpClient.get("[YOUR_BLACKLIST_URL]", function(error, response, data) {
+            $httpClient.get("https://example.com/get_blackmail", function(error, response, data) {
                 if (error) {
-                    console.error("获取黑名单数据时出错: " + error);
+                    console.log("获取黑名单数据时出错: " + error);
                     notifications.push("获取黑名单数据失败: " + error);
                     sendFinalNotification("错误", mallName + "白名单店铺", notifications.join("; "));
                     $done({});
                     return;
                 }
-                console.log("已从服务器获取新的黑名单数据。储存并继续流程。");
+
                 $persistentStore.write(data, "blackmailMallName");
-                mallBool = storedMallName.includes(mallName) ? "黑" : "白";
+                console.log("已从服务器获取新的黑名单数据。");
+                mallBool = data.includes(mallName) ? "黑" : "白";
                 processResponseBody(responseBody, mallBool, mallName);
             });
         } else {
@@ -55,61 +57,75 @@
     }
 
     function processResponseBody(responseBody, mallBool, mallName) {
-        analyzeProductData(responseBody, mallBool, mallName);
-        sendFinalNotification("成功", mallName + (mallBool === "黑" ? "黑名单店铺" : "白名单店铺"), notifications.join("; "));
-        $done({});
-    }
-
-    function analyzeProductData(responseBody, mallBool, mallName) {
-        console.log("分析商品数据...");
-        const maxPrice = 0.81;
-        var lowestPrice = Infinity;
-        var lowestPriceSkuInfo;
-
-        try {
-            // Add checks and data extraction
-            console.log("价格低于设定值，可进行上传");
-            uploadProductInfo(
-                "product_info",
-                goods_name,
-                mallName,
-                lowestPrice,
-                goods_id,
-                group_id,
-                sku_id,
-                detail_id,
-                mall_id,
-                pdd_route,
-                activity_id,
-                mallBool
-            );
-        } catch (error) {
-            console.error("商品数据解析错误: " + error);
-            notifications.push("商品数据解析错误: " + error);
+        if (mallBool === "黑") {
+            console.log("该商店在黑名单中，不处理数据。");
+            notifications.push("该商店在黑名单中。");
+            sendFinalNotification("通知", mallName + "黑名单店铺", notifications.join("; "));
+            $done({});
+        } else {
+            console.log("该商店不在黑名单中，继续处理数据。");
+            analyzeProductData(responseBody, mallBool, mallName);
         }
     }
 
-    function uploadProductInfo(tableName, goods_name, mallName, price, goods_id, group_id, sku_id, detail_id, mall_id, pdd_route, activity_id, mallBool) {
-        console.log("构建数据上传URL...");
+    function analyzeProductData(responseBody, mallBool, mallName) {
+        const maxPrice = 0.81;
+        var lowestPrice = Infinity;
+        var lowestPriceSkuInfo;
+        console.log("商品价格分析中...");
 
-        // Url should be completed according to your setting
+        var skuJson = responseBody?.sku;
+        if (skuJson) {
+            skuJson.forEach((sku) => {
+                var priceOriginal = parseFloat(sku.normal_price) / 100;
+                var selectedPrice = Math.min(priceOriginal, sku.group_price ? parseFloat(sku.group_price) / 100 : priceOriginal);
 
-        console.log("完成URL构建: " + url);
+                if (selectedPrice <= maxPrice) {
+                    if (selectedPrice < lowestPrice) {
+                        lowestPrice = selectedPrice;
+                        lowestPriceSkuInfo = {
+                            sku_id: sku.sku_id,
+                            goods_id: sku.goods_id               
+                        };
+                    }
+                }
+            });
+
+            if (lowestPrice !== Infinity) {
+                uploadProductInfo("product_info", responseBody.goods.goods_name, mallName, lowestPrice, lowestPriceSkuInfo.sku_id, responseBody.goods.group_id);
+                notifications.push("价格符合，数据已上传。");
+                sendFinalNotification("成功", mallName + "白名单店铺", notifications.join("; "));
+            } else {
+                console.log("未找到合适的商品价格。");
+                notifications.push("未找到合适的商品价格。");
+                sendFinalNotification("错误", "价格分析错误", notifications.join("; "));
+            }
+        } else {
+            console.log("商品数据未包含SKU信息。");
+            notifications.push("商品数据未包含SKU信息。");
+            sendFinalNotification("错误", "数据解析错误", notifications.join("; "));
+        }
+        $done({});
+    }
+
+    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, group_id) {
+        console.log("准备上传商品信息...");
+        var url = `http://example.com/upload?name=${encodeURIComponent(goods_name)}&mall=${encodeURIComponent(mallName)}&price=${price}&sku=${sku_id}&group=${group_id}`;
+        console.log("上传URL: " + url);
+
         $httpClient.get(url, function(error, response, data) {
             if (error) {
-                console.error("上传商品信息时出错: " + error);
-                notifications.push("上传商品信息失败: " + error);
+                console.log("上传商品信息时出错: " + error);
             } else {
                 console.log("商品信息上传成功: " + data);
-                notifications.push("成功上传商品信息: " + data);
             }
-            sendFinalNotification("成功", mallName + "白名单店铺", notifications.join("; "));
-            $done({});
         });
     }
 
     function sendFinalNotification(type, title, content) {
-        console.log("发送通知: " + title);
-        $notification.post(type, title, content);
+        console.log("发送最终通知：" + title);
+        if ($notification) {
+            $notification.post(type, title, content);
+        }
     }
 })();

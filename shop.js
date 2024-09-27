@@ -86,7 +86,19 @@
                 }
             });
             if (lowestPrice !== Infinity) {
-                uploadProductInfo("product_info", responseBody.goods.goods_name, mallName, lowestPrice, lowestPriceSkuInfo.sku_id, responseBody.goods.group_id, mallBool);
+                uploadProductInfo(
+                    "product_info",
+                    responseBody.goods.goods_name,
+                    mallName,
+                    lowestPrice,
+                    lowestPriceSkuInfo.sku_id,
+                    lowestPriceSkuInfo.goods_id,
+                    responseBody.goods.group_id,
+                    responseBody.mall_id,
+                    mallBool,
+                    responseBody.pdd_route,
+                    responseBody.activity_id
+                );
                 notifications.push("价格符合，数据已上传。");
                 sendFinalNotification("成功", mallName + "正常店铺", notifications.join("; "));
             } else {
@@ -102,9 +114,9 @@
         $done({});
     }
 
-    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, group_id, mallBool) {
+    function uploadProductInfo(tableName, goods_name, mallName, price, sku_id, goods_id, group_id, mall_id, mallBool, pdd_route, activity_id) {
         console.log("准备上传商品信息...");
-        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&detailId=${detail_id}&mall_id=${mall_id}&mall_bool=${mallBool}&shop_bool=${shopBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
+        var url = `http://207.46.141.108:13312/upload.php?auth=z777999&table_name=${encodeURIComponent(tableName)}&good_name=${encodeURIComponent(goods_name)}&mallName=${encodeURIComponent(mallName)}&price_int=${price}&good_id=${goods_id}&group_Id=${group_id}&sku_Id=${sku_id}&mall_id=${mall_id}&mall_bool=${mallBool}&mall_url=${encodeURIComponent(pdd_route)}&activity_id=${activity_id}`; 
         console.log("上传URL: " + url);
         $httpClient.get(url, function(error, response, data) {
             if (error) {

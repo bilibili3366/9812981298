@@ -36,25 +36,19 @@
                     console.log("获取黑名单数据时出错: " + error);
                     notifications.push("获取黑名单数据失败: " + error);
                     sendFinalNotification("错误", mallName + "白名单店铺", notifications.join("; "));
-                    $done({});
                     return;
                 }
 
                 $persistentStore.write(data, "blackmailMallName");
                 notifications.push("已从服务器获取新的黑名单数据。");
-                processResponseBody(responseBody, mallBool, mallName);
             });
+        } else if (storedMallName.includes(mallName)) {
+            notifications.push("黑名单店铺。");
+            mallBool = "黑";
         } else {
-            mallBool = storedMallName.includes(mallName) ? "黑" : "白";
-            notifications.push(mallBool === "黑" ? "黑名单店铺。" : "正常店铺。");
-            processResponseBody(responseBody, mallBool, mallName);
+            notifications.push("正常店铺。");
+            analyzeProductData(responseBody, mallBool, mallName);
         }
-    }
-
-    function processResponseBody(responseBody, mallBool, mallName) {
-        analyzeProductData(responseBody, mallBool, mallName);
-        sendFinalNotification("成功", mallName + (mallBool === "黑" ? "黑名单店铺" : "白名单店铺"), notifications.join("; "));
-        $done({});
     }
 
     function analyzeProductData(responseBody, mallBool, mallName) {
@@ -82,7 +76,7 @@
                     var group_price = parseFloat(sku.group_price) / 100;
 
                     var selectedPrice = Math.min(price_original, group_price);
-
+                    
                     if (selectedPrice > 0.05 && selectedPrice <= maxPrice) {
                         if (selectedPrice < lowestPrice) {
                             lowestPrice = selectedPrice;
@@ -139,12 +133,10 @@
                 console.log("上传商品信息时出错: " + error);
                 notifications.push("上传商品信息失败: " + error);
                 sendFinalNotification("错误", mallName + "黑名单店铺", notifications.join("; "));
-                $done({});
             } else {
                 console.log("商品信息上传成功: " + data);
                 notifications.push("商品信息上传成功: " + data);
                 sendFinalNotification("成功", mallName + "白名单店铺", notifications.join("; "));
-                $done({});
             }
         });
     }
